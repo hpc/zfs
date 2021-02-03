@@ -70,6 +70,13 @@ typedef struct vdev_raidz {
 	int vd_nparity;
 } vdev_raidz_t;
 
+#ifdef ZIA
+void vdev_raidz_generate_parity_p(struct raidz_row *);
+void vdev_raidz_generate_parity_pq(struct raidz_row *);
+void vdev_raidz_generate_parity_pqr(struct raidz_row *);
+void vdev_raidz_reconstruct_general(struct raidz_row *, int *, int);
+#endif
+
 #ifdef	__cplusplus
 }
 #endif

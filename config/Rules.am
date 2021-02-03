@@ -41,6 +41,7 @@ AM_CPPFLAGS += -DPKGDATADIR=\"$(pkgdatadir)\"
 AM_CPPFLAGS += $(DEBUG_CPPFLAGS)
 AM_CPPFLAGS += $(CODE_COVERAGE_CPPFLAGS)
 AM_CPPFLAGS += -DTEXT_DOMAIN=\"zfs-@ac_system_l@-user\"
+AM_CPPFLAGS += $(ZIA_CPPFLAGS)
 
 AM_CPPFLAGS_NOCHECK  = -D"strtok(...)=strtok(__VA_ARGS__) __attribute__((deprecated(\"Use strtok_r(3) instead!\")))"
 AM_CPPFLAGS_NOCHECK += -D"__xpg_basename(...)=__xpg_basename(__VA_ARGS__) __attribute__((deprecated(\"basename(3) is underspecified. Use zfs_basename() instead!\")))"
