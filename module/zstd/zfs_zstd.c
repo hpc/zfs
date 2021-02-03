@@ -594,6 +594,8 @@ zfs_zstd_compress(void *s_start, void *d_start, size_t s_len, size_t d_len,
 	return (c_len + sizeof (*hdr));
 }
 
+EXPORT_SYMBOL(zfs_zstd_compress);
+
 /* Decompress block using zstd and return its stored level */
 int
 zfs_zstd_decompress_level(void *s_start, void *d_start, size_t s_len,
@@ -679,6 +681,8 @@ zfs_zstd_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len,
 	return (zfs_zstd_decompress_level(s_start, d_start, s_len, d_len,
 	    NULL));
 }
+
+EXPORT_SYMBOL(zfs_zstd_decompress);
 
 /* Allocator for zstd compression context using mempool_allocator */
 static void *

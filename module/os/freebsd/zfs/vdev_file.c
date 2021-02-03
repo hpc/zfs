@@ -68,7 +68,7 @@ vdev_file_rele(vdev_t *vd)
 	ASSERT3P(vd->vdev_path, !=, NULL);
 }
 
-static mode_t
+mode_t
 vdev_file_open_mode(spa_mode_t spa_mode)
 {
 	mode_t mode = 0;
