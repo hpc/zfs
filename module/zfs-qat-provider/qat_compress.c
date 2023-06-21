@@ -27,7 +27,7 @@
 #include <sys/zfs_context.h>
 #include <sys/byteorder.h>
 #include <sys/zio.h>
-#include <sys/qat.h>
+#include <qat.h>
 
 /*
  * Max instances in a QAT device, each instance is a channel to submit
@@ -49,13 +49,11 @@ static CpaBufferList **buffer_array[QAT_DC_MAX_INSTANCES];
 static Cpa16U num_inst = 0;
 static Cpa32U inst_num = 0;
 static boolean_t qat_dc_init_done = B_FALSE;
-int zfs_qat_compress_disable = 0;
 
 boolean_t
 qat_dc_use_accel(size_t s_len)
 {
-	return (!zfs_qat_compress_disable &&
-	    qat_dc_init_done &&
+	return (qat_dc_init_done &&
 	    s_len >= QAT_MIN_BUF_SIZE &&
 	    s_len <= QAT_MAX_BUF_SIZE);
 }
@@ -522,31 +520,5 @@ qat_compress(qat_compress_dir_t dir, char *src, int src_len,
 
 	return (ret);
 }
-
-static int
-param_set_qat_compress(const char *val, zfs_kernel_param_t *kp)
-{
-	int ret;
-	int *pvalue = kp->arg;
-	ret = param_set_int(val, kp);
-	if (ret)
-		return (ret);
-	/*
-	 * zfs_qat_compress_disable = 0: enable qat compress
-	 * try to initialize qat instance if it has not been done
-	 */
-	if (*pvalue == 0 && !qat_dc_init_done) {
-		ret = qat_dc_init();
-		if (ret != 0) {
-			zfs_qat_compress_disable = 1;
-			return (ret);
-		}
-	}
-	return (ret);
-}
-
-module_param_call(zfs_qat_compress_disable, param_set_qat_compress,
-    param_get_int, &zfs_qat_compress_disable, 0644);
-MODULE_PARM_DESC(zfs_qat_compress_disable, "Enable/Disable QAT compression");
 
 #endif

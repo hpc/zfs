@@ -19,8 +19,8 @@
  * CDDL HEADER END
  */
 
-#ifndef	_SYS_QAT_H
-#define	_SYS_QAT_H
+#ifndef	_QAT_H
+#define	_QAT_H
 
 typedef enum qat_compress_dir {
 	QAT_DECOMPRESS = 0,
@@ -31,7 +31,6 @@ typedef enum qat_encrypt_dir {
 	QAT_DECRYPT = 0,
 	QAT_ENCRYPT = 1,
 } qat_encrypt_dir_t;
-
 
 #if defined(_KERNEL) && defined(HAVE_QAT)
 #include <sys/zio.h>
@@ -47,104 +46,6 @@ typedef enum qat_encrypt_dir {
  */
 #define	QAT_MIN_BUF_SIZE	(4*1024)
 #define	QAT_MAX_BUF_SIZE	(128*1024)
-
-/*
- * Used for QAT kstat.
- */
-typedef struct qat_stats {
-	/*
-	 * Number of jobs submitted to QAT compression engine.
-	 */
-	kstat_named_t comp_requests;
-	/*
-	 * Total bytes sent to QAT compression engine.
-	 */
-	kstat_named_t comp_total_in_bytes;
-	/*
-	 * Total bytes output from QAT compression engine.
-	 */
-	kstat_named_t comp_total_out_bytes;
-	/*
-	 * Number of jobs submitted to QAT de-compression engine.
-	 */
-	kstat_named_t decomp_requests;
-	/*
-	 * Total bytes sent to QAT de-compression engine.
-	 */
-	kstat_named_t decomp_total_in_bytes;
-	/*
-	 * Total bytes output from QAT de-compression engine.
-	 */
-	kstat_named_t decomp_total_out_bytes;
-	/*
-	 * Number of fails in the QAT compression / decompression engine.
-	 * Note: when a QAT error happens, it doesn't necessarily indicate a
-	 * critical hardware issue. Sometimes it is because the output buffer
-	 * is not big enough. The compression job will be transferred to the
-	 * gzip software implementation so the functionality of ZFS is not
-	 * impacted.
-	 */
-	kstat_named_t dc_fails;
-
-	/*
-	 * Number of jobs submitted to QAT encryption engine.
-	 */
-	kstat_named_t encrypt_requests;
-	/*
-	 * Total bytes sent to QAT encryption engine.
-	 */
-	kstat_named_t encrypt_total_in_bytes;
-	/*
-	 * Total bytes output from QAT encryption engine.
-	 */
-	kstat_named_t encrypt_total_out_bytes;
-	/*
-	 * Number of jobs submitted to QAT decryption engine.
-	 */
-	kstat_named_t decrypt_requests;
-	/*
-	 * Total bytes sent to QAT decryption engine.
-	 */
-	kstat_named_t decrypt_total_in_bytes;
-	/*
-	 * Total bytes output from QAT decryption engine.
-	 */
-	kstat_named_t decrypt_total_out_bytes;
-	/*
-	 * Number of fails in the QAT encryption / decryption engine.
-	 * Note: when a QAT error happens, it doesn't necessarily indicate a
-	 * critical hardware issue. The encryption job will be transferred
-	 * to the software implementation so the functionality of ZFS is
-	 * not impacted.
-	 */
-	kstat_named_t crypt_fails;
-
-	/*
-	 * Number of jobs submitted to QAT checksum engine.
-	 */
-	kstat_named_t cksum_requests;
-	/*
-	 * Total bytes sent to QAT checksum engine.
-	 */
-	kstat_named_t cksum_total_in_bytes;
-	/*
-	 * Number of fails in the QAT checksum engine.
-	 * Note: when a QAT error happens, it doesn't necessarily indicate a
-	 * critical hardware issue. The checksum job will be transferred to the
-	 * software implementation so the functionality of ZFS is not impacted.
-	 */
-	kstat_named_t cksum_fails;
-} qat_stats_t;
-
-#define	QAT_STAT_INCR(stat, val) \
-	atomic_add_64(&qat_stats.stat.value.ui64, (val))
-#define	QAT_STAT_BUMP(stat) \
-	QAT_STAT_INCR(stat, 1)
-
-extern qat_stats_t qat_stats;
-extern int zfs_qat_compress_disable;
-extern int zfs_qat_checksum_disable;
-extern int zfs_qat_encrypt_disable;
 
 /* inlined for performance */
 static inline struct page *
@@ -167,8 +68,6 @@ extern int qat_dc_init(void);
 extern void qat_dc_fini(void);
 extern int qat_cy_init(void);
 extern void qat_cy_fini(void);
-extern int qat_init(void);
-extern void qat_fini(void);
 
 /* fake CpaStatus used to indicate data was not compressible */
 #define	CPA_STATUS_INCOMPRESSIBLE		(-127)
@@ -186,8 +85,10 @@ extern int qat_checksum(uint64_t cksum, uint8_t *buf, uint64_t size,
 #else
 #define	CPA_STATUS_SUCCESS			0
 #define	CPA_STATUS_INCOMPRESSIBLE		(-127)
-#define	qat_init()
-#define	qat_fini()
+#define	qat_dc_init() (-1)
+#define	qat_dc_fini()
+#define	qat_cy_init() (-1)
+#define	qat_cy_fini()
 #define	qat_dc_use_accel(s_len)			((void) sizeof (s_len), 0)
 #define	qat_crypt_use_accel(s_len)		((void) sizeof (s_len), 0)
 #define	qat_checksum_use_accel(s_len)		((void) sizeof (s_len), 0)
