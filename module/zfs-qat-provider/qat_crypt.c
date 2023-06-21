@@ -26,7 +26,6 @@
  * compression instances, so that code is separated into qat_compress.c
  */
 
-#if defined(_KERNEL) && defined(HAVE_QAT)
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/pagemap.h>
@@ -35,7 +34,7 @@
 #include <sys/zio_crypt.h>
 #include "lac/cpa_cy_im.h"
 #include "lac/cpa_cy_common.h"
-#include <sys/qat.h>
+#include <qat.h>
 
 /*
  * Max instances in a QAT device, each instance is a channel to submit
@@ -51,8 +50,6 @@ static Cpa32U inst_num = 0;
 static Cpa16U num_inst = 0;
 static CpaInstanceHandle cy_inst_handles[QAT_CRYPT_MAX_INSTANCES];
 static boolean_t qat_cy_init_done = B_FALSE;
-int zfs_qat_encrypt_disable = 0;
-int zfs_qat_checksum_disable = 0;
 
 typedef struct cy_callback {
 	CpaBoolean verify_result;
@@ -75,8 +72,7 @@ symcallback(void *p_callback, CpaStatus status, const CpaCySymOp operation,
 boolean_t
 qat_crypt_use_accel(size_t s_len)
 {
-	return (!zfs_qat_encrypt_disable &&
-	    qat_cy_init_done &&
+	return (qat_cy_init_done &&
 	    s_len >= QAT_MIN_BUF_SIZE &&
 	    s_len <= QAT_MAX_BUF_SIZE);
 }
@@ -84,13 +80,12 @@ qat_crypt_use_accel(size_t s_len)
 boolean_t
 qat_checksum_use_accel(size_t s_len)
 {
-	return (!zfs_qat_checksum_disable &&
-	    qat_cy_init_done &&
+	return (qat_cy_init_done &&
 	    s_len >= QAT_MIN_BUF_SIZE &&
 	    s_len <= QAT_MAX_BUF_SIZE);
 }
 
-void
+static void
 qat_cy_clean(void)
 {
 	for (Cpa16U i = 0; i < num_inst; i++)
@@ -316,23 +311,12 @@ qat_crypt(qat_encrypt_dir_t dir, uint8_t *src_buf, uint8_t *dst_buf,
 	Cpa32U in_page_off = 0;
 	Cpa32U out_page_off = 0;
 
-	if (dir == QAT_ENCRYPT) {
-		QAT_STAT_BUMP(encrypt_requests);
-		QAT_STAT_INCR(encrypt_total_in_bytes, enc_len);
-	} else {
-		QAT_STAT_BUMP(decrypt_requests);
-		QAT_STAT_INCR(decrypt_total_in_bytes, enc_len);
-	}
-
 	i = (Cpa32U)atomic_inc_32_nv(&inst_num) % num_inst;
 	cy_inst_handle = cy_inst_handles[i];
 
 	status = qat_init_crypt_session_ctx(dir, cy_inst_handle,
 	    &cy_session_ctx, key, crypt, aad_len);
 	if (status != CPA_STATUS_SUCCESS) {
-		/* don't count CCM as a failure since it's not supported */
-		if (zio_crypt_table[crypt].ci_crypt_type == ZC_TYPE_GCM)
-			QAT_STAT_BUMP(crypt_fails);
 		return (status);
 	}
 
@@ -436,15 +420,9 @@ qat_crypt(qat_encrypt_dir_t dir, uint8_t *src_buf, uint8_t *dst_buf,
 	if (dir == QAT_ENCRYPT) {
 		/* if dir is QAT_ENCRYPT, save pDigestResult to digest_buf */
 		memcpy(digest_buf, op_data.pDigestResult, ZIO_DATA_MAC_LEN);
-		QAT_STAT_INCR(encrypt_total_out_bytes, enc_len);
-	} else {
-		QAT_STAT_INCR(decrypt_total_out_bytes, enc_len);
 	}
 
 fail:
-	if (status != CPA_STATUS_SUCCESS)
-		QAT_STAT_BUMP(crypt_fails);
-
 	for (i = 0; i < in_page_num; i++)
 		kunmap(in_pages[i]);
 	for (i = 0; i < out_page_num; i++)
@@ -484,19 +462,12 @@ qat_checksum(uint64_t cksum, uint8_t *buf, uint64_t size, zio_cksum_t *zcp)
 	Cpa32U page_num = 0;
 	Cpa32U page_off = 0;
 
-	QAT_STAT_BUMP(cksum_requests);
-	QAT_STAT_INCR(cksum_total_in_bytes, size);
-
 	i = (Cpa32U)atomic_inc_32_nv(&inst_num) % num_inst;
 	cy_inst_handle = cy_inst_handles[i];
 
 	status = qat_init_checksum_session_ctx(cy_inst_handle,
 	    &cy_session_ctx, cksum);
 	if (status != CPA_STATUS_SUCCESS) {
-		/* don't count unsupported checksums as a failure */
-		if (cksum == ZIO_CHECKSUM_SHA256 ||
-		    cksum == ZIO_CHECKSUM_SHA512)
-			QAT_STAT_BUMP(cksum_fails);
 		return (status);
 	}
 
@@ -560,9 +531,6 @@ qat_checksum(uint64_t cksum, uint8_t *buf, uint64_t size, zio_cksum_t *zcp)
 	memcpy(zcp, digest_buffer, sizeof (zio_cksum_t));
 
 fail:
-	if (status != CPA_STATUS_SUCCESS)
-		QAT_STAT_BUMP(cksum_fails);
-
 	for (i = 0; i < page_num; i++)
 		kunmap(in_pages[i]);
 
@@ -574,57 +542,3 @@ fail:
 
 	return (status);
 }
-
-static int
-param_set_qat_encrypt(const char *val, zfs_kernel_param_t *kp)
-{
-	int ret;
-	int *pvalue = kp->arg;
-	ret = param_set_int(val, kp);
-	if (ret)
-		return (ret);
-	/*
-	 * zfs_qat_encrypt_disable = 0: enable qat encrypt
-	 * try to initialize qat instance if it has not been done
-	 */
-	if (*pvalue == 0 && !qat_cy_init_done) {
-		ret = qat_cy_init();
-		if (ret != 0) {
-			zfs_qat_encrypt_disable = 1;
-			return (ret);
-		}
-	}
-	return (ret);
-}
-
-static int
-param_set_qat_checksum(const char *val, zfs_kernel_param_t *kp)
-{
-	int ret;
-	int *pvalue = kp->arg;
-	ret = param_set_int(val, kp);
-	if (ret)
-		return (ret);
-	/*
-	 * set_checksum_param_ops = 0: enable qat checksum
-	 * try to initialize qat instance if it has not been done
-	 */
-	if (*pvalue == 0 && !qat_cy_init_done) {
-		ret = qat_cy_init();
-		if (ret != 0) {
-			zfs_qat_checksum_disable = 1;
-			return (ret);
-		}
-	}
-	return (ret);
-}
-
-module_param_call(zfs_qat_encrypt_disable, param_set_qat_encrypt,
-    param_get_int, &zfs_qat_encrypt_disable, 0644);
-MODULE_PARM_DESC(zfs_qat_encrypt_disable, "Enable/Disable QAT encryption");
-
-module_param_call(zfs_qat_checksum_disable, param_set_qat_checksum,
-    param_get_int, &zfs_qat_checksum_disable, 0644);
-MODULE_PARM_DESC(zfs_qat_checksum_disable, "Enable/Disable QAT checksumming");
-
-#endif
