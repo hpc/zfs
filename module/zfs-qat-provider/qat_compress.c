@@ -19,7 +19,6 @@
  * CDDL HEADER END
  */
 
-#if defined(_KERNEL) && defined(HAVE_QAT)
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/pagemap.h>
@@ -27,7 +26,7 @@
 #include <sys/zfs_context.h>
 #include <sys/byteorder.h>
 #include <sys/zio.h>
-#include <sys/qat.h>
+#include <qat.h>
 
 /*
  * Max instances in a QAT device, each instance is a channel to submit
@@ -49,13 +48,11 @@ static CpaBufferList **buffer_array[QAT_DC_MAX_INSTANCES];
 static Cpa16U num_inst = 0;
 static Cpa32U inst_num = 0;
 static boolean_t qat_dc_init_done = B_FALSE;
-int zfs_qat_compress_disable = 0;
 
 boolean_t
 qat_dc_use_accel(size_t s_len)
 {
-	return (!zfs_qat_compress_disable &&
-	    qat_dc_init_done &&
+	return (qat_dc_init_done &&
 	    s_len >= QAT_MIN_BUF_SIZE &&
 	    s_len <= QAT_MAX_BUF_SIZE);
 }
@@ -102,7 +99,7 @@ qat_dc_clean(void)
 }
 
 int
-qat_dc_init(void)
+qat_dc_init(Cpa16U *dev_count)
 {
 	CpaStatus status = CPA_STATUS_SUCCESS;
 	Cpa32U sess_size = 0;
@@ -214,6 +211,9 @@ qat_dc_init(void)
 	}
 
 	qat_dc_init_done = B_TRUE;
+	if (dev_count) {
+		*dev_count = num_inst;
+	}
 	return (0);
 fail:
 	qat_dc_clean();
@@ -391,9 +391,6 @@ qat_compress_impl(qat_compress_dir_t dir, char *src, int src_len,
 	init_completion(&complete);
 
 	if (dir == QAT_COMPRESS) {
-		QAT_STAT_BUMP(comp_requests);
-		QAT_STAT_INCR(comp_total_in_bytes, src_len);
-
 		cpaDcGenerateHeader(session_handle,
 		    buf_list_dst->pBuffers, &hdr_sz);
 		buf_list_dst->pBuffers->pData += hdr_sz;
@@ -426,11 +423,8 @@ qat_compress_impl(qat_compress_dir_t dir, char *src, int src_len,
 		    BSWAP_32(dc_results.checksum);
 
 		*c_len = hdr_sz + compressed_sz + ZLIB_FOOT_SZ;
-		QAT_STAT_INCR(comp_total_out_bytes, *c_len);
 	} else {
 		ASSERT3U(dir, ==, QAT_DECOMPRESS);
-		QAT_STAT_BUMP(decomp_requests);
-		QAT_STAT_INCR(decomp_total_in_bytes, src_len);
 
 		buf_list_src->pBuffers->pData += ZLIB_HEAD_SZ;
 		buf_list_src->pBuffers->dataLenInBytes -= ZLIB_HEAD_SZ;
@@ -458,13 +452,9 @@ qat_compress_impl(qat_compress_dir_t dir, char *src, int src_len,
 			goto fail;
 		}
 		*c_len = dc_results.produced;
-		QAT_STAT_INCR(decomp_total_out_bytes, *c_len);
 	}
 
 fail:
-	if (status != CPA_STATUS_SUCCESS && status != CPA_STATUS_INCOMPRESSIBLE)
-		QAT_STAT_BUMP(dc_fails);
-
 	if (in_pages) {
 		for (page_num = 0;
 		    page_num < buf_list_src->numBuffers;
@@ -522,31 +512,3 @@ qat_compress(qat_compress_dir_t dir, char *src, int src_len,
 
 	return (ret);
 }
-
-static int
-param_set_qat_compress(const char *val, zfs_kernel_param_t *kp)
-{
-	int ret;
-	int *pvalue = kp->arg;
-	ret = param_set_int(val, kp);
-	if (ret)
-		return (ret);
-	/*
-	 * zfs_qat_compress_disable = 0: enable qat compress
-	 * try to initialize qat instance if it has not been done
-	 */
-	if (*pvalue == 0 && !qat_dc_init_done) {
-		ret = qat_dc_init();
-		if (ret != 0) {
-			zfs_qat_compress_disable = 1;
-			return (ret);
-		}
-	}
-	return (ret);
-}
-
-module_param_call(zfs_qat_compress_disable, param_set_qat_compress,
-    param_get_int, &zfs_qat_compress_disable, 0644);
-MODULE_PARM_DESC(zfs_qat_compress_disable, "Enable/Disable QAT compression");
-
-#endif
