@@ -72,7 +72,6 @@ COMMON_H = \
 	sys/nvpair_impl.h \
 	sys/objlist.h \
 	sys/pathname.h \
-	sys/qat.h \
 	sys/range_tree.h \
 	sys/rrwlock.h \
 	sys/sa.h \

@@ -35,7 +35,7 @@
 #include <sys/zio_crypt.h>
 #include "lac/cpa_cy_im.h"
 #include "lac/cpa_cy_common.h"
-#include <sys/qat.h>
+#include <qat.h>
 
 /*
  * Max instances in a QAT device, each instance is a channel to submit
@@ -51,8 +51,6 @@ static Cpa32U inst_num = 0;
 static Cpa16U num_inst = 0;
 static CpaInstanceHandle cy_inst_handles[QAT_CRYPT_MAX_INSTANCES];
 static boolean_t qat_cy_init_done = B_FALSE;
-int zfs_qat_encrypt_disable = 0;
-int zfs_qat_checksum_disable = 0;
 
 typedef struct cy_callback {
 	CpaBoolean verify_result;
@@ -75,8 +73,7 @@ symcallback(void *p_callback, CpaStatus status, const CpaCySymOp operation,
 boolean_t
 qat_crypt_use_accel(size_t s_len)
 {
-	return (!zfs_qat_encrypt_disable &&
-	    qat_cy_init_done &&
+	return (qat_cy_init_done &&
 	    s_len >= QAT_MIN_BUF_SIZE &&
 	    s_len <= QAT_MAX_BUF_SIZE);
 }
@@ -84,8 +81,7 @@ qat_crypt_use_accel(size_t s_len)
 boolean_t
 qat_checksum_use_accel(size_t s_len)
 {
-	return (!zfs_qat_checksum_disable &&
-	    qat_cy_init_done &&
+	return (qat_cy_init_done &&
 	    s_len >= QAT_MIN_BUF_SIZE &&
 	    s_len <= QAT_MAX_BUF_SIZE);
 }
@@ -574,57 +570,5 @@ fail:
 
 	return (status);
 }
-
-static int
-param_set_qat_encrypt(const char *val, zfs_kernel_param_t *kp)
-{
-	int ret;
-	int *pvalue = kp->arg;
-	ret = param_set_int(val, kp);
-	if (ret)
-		return (ret);
-	/*
-	 * zfs_qat_encrypt_disable = 0: enable qat encrypt
-	 * try to initialize qat instance if it has not been done
-	 */
-	if (*pvalue == 0 && !qat_cy_init_done) {
-		ret = qat_cy_init();
-		if (ret != 0) {
-			zfs_qat_encrypt_disable = 1;
-			return (ret);
-		}
-	}
-	return (ret);
-}
-
-static int
-param_set_qat_checksum(const char *val, zfs_kernel_param_t *kp)
-{
-	int ret;
-	int *pvalue = kp->arg;
-	ret = param_set_int(val, kp);
-	if (ret)
-		return (ret);
-	/*
-	 * set_checksum_param_ops = 0: enable qat checksum
-	 * try to initialize qat instance if it has not been done
-	 */
-	if (*pvalue == 0 && !qat_cy_init_done) {
-		ret = qat_cy_init();
-		if (ret != 0) {
-			zfs_qat_checksum_disable = 1;
-			return (ret);
-		}
-	}
-	return (ret);
-}
-
-module_param_call(zfs_qat_encrypt_disable, param_set_qat_encrypt,
-    param_get_int, &zfs_qat_encrypt_disable, 0644);
-MODULE_PARM_DESC(zfs_qat_encrypt_disable, "Enable/Disable QAT encryption");
-
-module_param_call(zfs_qat_checksum_disable, param_set_qat_checksum,
-    param_get_int, &zfs_qat_checksum_disable, 0644);
-MODULE_PARM_DESC(zfs_qat_checksum_disable, "Enable/Disable QAT checksumming");
 
 #endif

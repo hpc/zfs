@@ -64,7 +64,6 @@
 #include "zfs_prop.h"
 #include <sys/btree.h>
 #include <sys/zfeature.h>
-#include <sys/qat.h>
 #include <sys/zstd/zstd.h>
 
 /*
@@ -2457,7 +2456,6 @@ spa_init(spa_mode_t mode)
 	vdev_prop_init();
 	l2arc_start();
 	scan_init();
-	qat_init();
 	spa_import_progress_init();
 }
 
@@ -2483,7 +2481,6 @@ spa_fini(void)
 	zfs_refcount_fini();
 	fm_fini();
 	scan_fini();
-	qat_fini();
 	spa_import_progress_destroy();
 
 	avl_destroy(&spa_namespace_avl);

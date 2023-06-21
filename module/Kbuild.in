@@ -49,11 +49,6 @@ CFLAGS_zfs/zap_micro.o += -mllvm -x86-cmov-converter=false
 endif
 endif
 
-ifneq ($(KBUILD_EXTMOD),)
-@CONFIG_QAT_TRUE@ZFS_MODULE_CFLAGS += -I@QAT_SRC@/include
-@CONFIG_QAT_TRUE@KBUILD_EXTRA_SYMBOLS += @QAT_SYMBOLS@
-endif
-
 asflags-y := $(ZFS_MODULE_CFLAGS) $(ZFS_MODULE_CPPFLAGS)
 ccflags-y := $(ZFS_MODULE_CFLAGS) $(ZFS_MODULE_CPPFLAGS)
 
@@ -441,9 +436,6 @@ ZFS_OBJS_OS := \
 	arc_os.o \
 	mmp_os.o \
 	policy.o \
-	qat.o \
-	qat_compress.o \
-	qat_crypt.o \
 	spa_misc_os.o \
 	trace.o \
 	vdev_disk.o \
@@ -501,6 +493,8 @@ $(obj)/zfs/vdev_raidz_math_powerpc_altivec.o : c_flags += -maltivec
 endif
 
 ifneq ("@DPUSM_SYMBOLS@","")
+@ZIA_ENABLED_TRUE@KBUILD_EXTRA_SYMBOLS += @DPUSM_SYMBOLS@
+
 obj-$(CONFIG_ZFS) += zia-software-provider.o
 
 ZIA_SOFTWARE_PROVIDER_OBJS := \
@@ -513,5 +507,22 @@ zia-software-provider-objs += os/linux/zfs/zfs_file_os.o
 
 $(addprefix $(obj)/zia-software-provider/,$(ZIA_SOFTWARE_PROVIDER_OBJS)) : ccflags-y += -I@abs_top_builddir@ $(ZFS_MODULE_CFLAGS) -I@abs_srcdir@/zia-software-provider/ -I@DPUSM_ROOT@/include
 
-@ZIA_ENABLED_TRUE@KBUILD_EXTRA_SYMBOLS += @DPUSM_SYMBOLS@
+ifeq ($(CONFIG_QAT_TRUE),y)
+
+obj-$(CONFIG_ZFS) += zfs-qat-provider.o
+
+ZFS_QAT_PROVIDER_OBJS := \
+    qat.o \
+    qat_compress.o \
+    qat_crypt.o \
+    provider.o
+
+zfs-qat-provider-objs += $(addprefix zfs-qat-provider/,$(ZFS_QAT_PROVIDER_OBJS))
+
+$(addprefix $(obj)/zfs-qat-provider/,$(ZFS_QAT_PROVIDER_OBJS)) : ccflags-y += -I@abs_top_builddir@ $(ZFS_MODULE_CFLAGS) -I@abs_srcdir@/zfs-qat-provider/ -I@DPUSM_ROOT@/include -I@QAT_SRC@/include
+
+@ZIA_ENABLED_TRUE@KBUILD_EXTRA_SYMBOLS += @QAT_SYMBOLS@
+
+endif
+
 endif

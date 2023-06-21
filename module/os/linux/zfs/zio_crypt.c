@@ -26,7 +26,6 @@
 #include <sys/zil.h>
 #include <sys/sha2.h>
 #include <sys/hkdf.h>
-#include <sys/qat.h>
 
 /*
  * This file is responsible for handling all of the details of generating
@@ -1939,37 +1938,6 @@ zio_do_crypt_data(boolean_t encrypt, zio_crypt_key_t *key,
 		tmpl = NULL;
 	}
 
-	/*
-	 * Attempt to use QAT acceleration if we can. We currently don't
-	 * do this for metadnode and ZIL blocks, since they have a much
-	 * more involved buffer layout and the qat_crypt() function only
-	 * works in-place.
-	 */
-	if (qat_crypt_use_accel(datalen) &&
-	    ot != DMU_OT_INTENT_LOG && ot != DMU_OT_DNODE) {
-		uint8_t *srcbuf, *dstbuf;
-
-		if (encrypt) {
-			srcbuf = plainbuf;
-			dstbuf = cipherbuf;
-		} else {
-			srcbuf = cipherbuf;
-			dstbuf = plainbuf;
-		}
-
-		ret = qat_crypt((encrypt) ? QAT_ENCRYPT : QAT_DECRYPT, srcbuf,
-		    dstbuf, NULL, 0, iv, mac, ckey, key->zk_crypt, datalen);
-		if (ret == CPA_STATUS_SUCCESS) {
-			if (locked) {
-				rw_exit(&key->zk_salt_lock);
-				locked = B_FALSE;
-			}
-
-			return (0);
-		}
-		/* If the hardware implementation fails fall back to software */
-	}
-
 	/* create uios for encryption */
 	ret = zio_crypt_init_uios(encrypt, key->zk_version, ot, plainbuf,
 	    cipherbuf, datalen, byteswap, mac, &puio, &cuio, &enc_len,
@@ -2061,4 +2029,9 @@ error:
 module_param(zfs_key_max_salt_uses, ulong, 0644);
 MODULE_PARM_DESC(zfs_key_max_salt_uses, "Max number of times a salt value "
 	"can be used for generating encryption keys before it is rotated");
+
+#if defined(ZIA) && defined(HAVE_QAT)
+EXPORT_SYMBOL(zio_crypt_table);
+#endif
+
 #endif
