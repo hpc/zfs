@@ -162,14 +162,43 @@ zfs_qat_provider_free(void *handle)
 static int
 zfs_qat_provider_copy_from_generic(dpusm_mv_t *mv, const void *buf, size_t size)
 {
-	memcpy(ptr_start(mv->handle, mv->offset), buf, size);
+	zqh_t *dst = (zqh_t *)mv->handle;
+	/*
+	 * If the handle points to a real buffer, free it,
+	 * and convert the handle to a reference to the
+	 * user's pointer.
+	 *
+	 * This is a layer violation, but is done to prevent
+	 * unnecessary copies of the data due to the QAT using
+	 * in-memory addresses.
+	 */
+	if ((dst->type == ZQH_REAL) &&
+	    (mv->offset == 0)) {
+		kfree(dst->ptr);
+
+		dst->type = ZQH_REF;
+		dst->ptr = (void *) buf;
+		dst->size = size;
+	}
+	else
+	{
+		memcpy(ptr_start(dst, mv->offset), buf, size);
+	}
 	return (DPUSM_OK);
 }
 
 static int
 zfs_qat_provider_copy_to_generic(dpusm_mv_t *mv, void *buf, size_t size)
 {
-	memcpy(buf, ptr_start(mv->handle, mv->offset), size);
+	zqh_t *src = (zqh_t *)mv->handle;
+	/*
+	 * if the handle is still a real buffer, it is not
+	 * the same as buf, so the contents have to be copied
+	 * into buf.
+	 */
+	if (src->type == ZQH_REAL) {
+		memcpy(buf, ptr_start(src, mv->offset), size);
+	}
 	return (DPUSM_OK);
 }
 
