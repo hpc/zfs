@@ -453,9 +453,7 @@ vdev_raidz_map_alloc_expanded(abd_t *abd, uint64_t size, uint64_t offset,
 		rr->rr_firstdatacol = nparity;
 		rr->rr_abd_empty = NULL;
 		rr->rr_nempty = 0;
-#ifdef ZIA
 		rr->rr_zia_handle = NULL;
-#endif
 
 		for (int c = 0; c < rr->rr_cols; c++, child_id++) {
 			if (child_id >= row_phys_cols) {

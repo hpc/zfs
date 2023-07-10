@@ -51,11 +51,8 @@
 #include <sys/trace_zfs.h>
 #include <sys/abd.h>
 #include <sys/dsl_crypt.h>
-#include <cityhash.h>
-
-#ifdef ZIA
 #include <sys/zia.h>
-#endif
+#include <cityhash.h>
 
 /*
  * ==========================================================================
@@ -446,9 +443,7 @@ static void
 zio_decompress(zio_t *zio, abd_t *data, uint64_t size)
 {
 	if (zio->io_error == 0) {
-		int ret = 0;
-#ifdef ZIA
-		ret = ZIA_FALLBACK;
+		int ret = ZIA_FALLBACK;
 		zia_props_t *zia_props = zia_get_props(zio->io_spa);
 		if ((zia_props->decompress == 1) &&
 		    (zio->io_can_offload == B_TRUE)) {
@@ -477,15 +472,13 @@ zio_decompress(zio_t *zio, abd_t *data, uint64_t size)
 			if (ret == ZIA_ACCELERATOR_DOWN) {
 				zia_disable_offloading(zio, B_FALSE);
 			}
-#endif
-		void *tmp = abd_borrow_buf(data, size);
-		ret = zio_decompress_data(BP_GET_COMPRESS(zio->io_bp),
-		    zio->io_abd, tmp, zio->io_size, size,
-		    &zio->io_prop.zp_complevel);
-		abd_return_buf_copy(data, tmp, size);
-#ifdef ZIA
+
+			void *tmp = abd_borrow_buf(data, size);
+			ret = zio_decompress_data(BP_GET_COMPRESS(zio->io_bp),
+			    zio->io_abd, tmp, zio->io_size, size,
+			    &zio->io_prop.zp_complevel);
+			abd_return_buf_copy(data, tmp, size);
 		}
-#endif
 
 		if (zio_injection_enabled && ret == 0)
 			ret = zio_handle_fault_injection(zio, EINVAL);
@@ -786,13 +779,11 @@ zio_notify_parent(zio_t *pio, zio_t *zio, enum zio_wait_type wait,
 	if (zio->io_error && !(zio->io_flags & ZIO_FLAG_DONT_PROPAGATE))
 		*errorp = zio_worst_error(*errorp, zio->io_error);
 	pio->io_reexecute |= zio->io_reexecute;
-#ifdef ZIA
 	if ((zio->io_flags & ZIO_FLAG_ZIA_REEXECUTE) &&
 	    (zio->io_can_offload != B_TRUE)) {
 		pio->io_flags |= ZIO_FLAG_ZIA_REEXECUTE;
 		pio->io_can_offload = B_FALSE;
 	}
-#endif
 	ASSERT3U(*countp, >, 0);
 
 	(*countp)--;
@@ -844,11 +835,9 @@ zio_inherit_child_errors(zio_t *zio, enum zio_child c)
 	if (zio->io_child_error[c] != 0 && zio->io_error == 0)
 		zio->io_error = zio->io_child_error[c];
 
-#ifdef ZIA
 	if (zio->io_flags & ZIO_FLAG_ZIA_REEXECUTE) {
 		zio->io_can_offload = B_FALSE;
 	}
-#endif
 }
 
 int
@@ -968,17 +957,13 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, const blkptr_t *bp,
 	if (zb != NULL)
 		zio->io_bookmark = *zb;
 
-#ifdef ZIA
 	zio->io_can_offload = zia_get_props(spa)->can_offload;
-#endif
 
 	if (pio != NULL) {
-#ifdef ZIA
 		if ((pio->io_flags & ZIO_FLAG_ZIA_REEXECUTE) ||
 		    (pio->io_can_offload != B_TRUE)) {
 			zio->io_can_offload = B_FALSE;
 		}
-#endif
 		zio->io_metaslab_class = pio->io_metaslab_class;
 		if (zio->io_logical == NULL)
 			zio->io_logical = pio->io_logical;
@@ -987,14 +972,12 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, const blkptr_t *bp,
 		zio_add_child_first(pio, zio);
 	}
 
-#ifdef ZIA
 	/* turn off encryption and dedup if Z.I.A. is used */
 	if (zia_is_used(zio) == B_TRUE) {
 		zio->io_prop.zp_dedup = B_FALSE;
 		zio->io_prop.zp_dedup_verify = B_FALSE;
 		zio->io_prop.zp_encrypt = B_FALSE;
 	}
-#endif
 
 	taskq_init_ent(&zio->io_tqent);
 
@@ -1864,7 +1847,6 @@ zio_write_compress(zio_t *zio)
 	if (compress != ZIO_COMPRESS_OFF &&
 	    !(zio->io_flags & ZIO_FLAG_RAW_COMPRESS)) {
 		void *cbuf = NULL;
-#ifdef ZIA
 		int zia_rc = ZIA_FALLBACK;
 		void *cbuf_handle = NULL; /* only valid if zia_rc == ZIA_OK */
 		zia_props_t *zia_props = zia_get_props(spa);
@@ -1891,23 +1873,17 @@ zio_write_compress(zio_t *zio)
 				zia_restart_before_vdev(zio);
 				return (zio);
 			}
-#endif
-		psize = zio_compress_data(compress, zio->io_abd, &cbuf, lsize,
-		    zp->zp_complevel);
-#ifdef ZIA
+			psize = zio_compress_data(compress, zio->io_abd, &cbuf,
+			    lsize, zp->zp_complevel);
 		}
-#endif
 
 		if (psize == 0) {
 			compress = ZIO_COMPRESS_OFF;
-#ifdef ZIA
 			ASSERT0(cbuf_handle);
-#endif
 		} else if (psize >= lsize) {
 			compress = ZIO_COMPRESS_OFF;
 			if (cbuf != NULL)
 				zio_buf_free(cbuf, lsize);
-#ifdef ZIA
 			/*
 			 * no need for offloaded
 			 * compressed buffer any more
@@ -1917,13 +1893,11 @@ zio_write_compress(zio_t *zio)
 			zia_free(&cbuf_handle);
 
 			/* source abd is still offloaded */
-#endif
 		} else if (!zp->zp_dedup && !zp->zp_encrypt &&
 		    psize <= BPE_PAYLOAD_SIZE &&
 		    zp->zp_level == 0 && !DMU_OT_HAS_FILL(zp->zp_type) &&
 		    spa_feature_is_enabled(spa, SPA_FEATURE_EMBEDDED_DATA)) {
 
-#ifdef ZIA
 			/*
 			 * compressed enough, but not handling embedded
 			 * data, so move compressed data back into memory
@@ -1952,7 +1926,6 @@ zio_write_compress(zio_t *zio)
 				zia_restart_before_vdev(zio);
 				return (zio);
 			}
-#endif
 			encode_embedded_bp_compressed(bp,
 			    cbuf, compress, lsize, psize);
 			BPE_SET_ETYPE(bp, BP_EMBEDDED_TYPE_DATA);
@@ -1977,7 +1950,6 @@ zio_write_compress(zio_t *zio)
 			    psize);
 			if (rounded >= lsize) {
 				compress = ZIO_COMPRESS_OFF;
-#ifdef ZIA
 				if (cbuf_handle) {
 					/*
 					 * catch accelerator
@@ -1985,22 +1957,16 @@ zio_write_compress(zio_t *zio)
 					 */
 					zia_free(&cbuf_handle);
 				} else {
-#endif
-				zio_buf_free(cbuf, lsize);
-#ifdef ZIA
+					zio_buf_free(cbuf, lsize);
 				}
-#endif
 				psize = lsize;
 			} else {
-#ifdef ZIA
 				/* abd_get_from_buf must not get a NULL */
 				if (cbuf_handle) {
 					cbuf = zio_buf_alloc(lsize);
 				}
-#endif
 				abd_t *cdata = abd_get_from_buf(cbuf, lsize);
 				abd_take_ownership_of_buf(cdata, B_TRUE);
-#ifdef ZIA
 				if (cbuf_handle) {
 					/*
 					 * zio->io_abd offload no longer needed
@@ -2038,17 +2004,14 @@ zio_write_compress(zio_t *zio)
 						return (zio);
 					}
 				}
-#endif
 				abd_zero_off(cdata, psize, rounded - psize);
 				psize = rounded;
 				zio_push_transform(zio, cdata,
 				    psize, lsize, NULL);
-#ifdef ZIA
 				if (zia_is_offloaded(zio->io_abd)) {
 					zio->io_flags |=
 					    ZIO_FLAG_DONT_AGGREGATE;
 				}
-#endif
 			}
 		}
 
@@ -4111,7 +4074,6 @@ zio_vdev_io_start(zio_t *zio)
 		if (zio->io_type == ZIO_TYPE_WRITE) {
 			abd_copy(abuf, zio->io_abd, zio->io_size);
 			abd_zero_off(abuf, zio->io_size, asize - zio->io_size);
-#ifdef ZIA
 			/*
 			 * The Z.I.A. handles of the abds that come here
 			 * were not modified and do not get associated with
@@ -4119,7 +4081,6 @@ zio_vdev_io_start(zio_t *zio)
 			 * the handle and delaying here, let abd_free clean
 			 * it up later.
 			 */
-#endif
 		}
 		zio_push_transform(zio, abuf, asize, asize, zio_subblock);
 	}
@@ -4310,9 +4271,7 @@ zio_vsd_default_cksum_report(zio_t *zio, zio_cksum_report_t *zcr)
 {
 	void *abd = abd_alloc_sametype(zio->io_abd, zio->io_size);
 
-#ifdef ZIA
 	zia_onload_abd(zio->io_abd, zio->io_size, B_FALSE);
-#endif
 
 	abd_copy(abd, zio->io_abd, zio->io_size);
 
@@ -4349,9 +4308,7 @@ zio_vdev_io_assess(zio_t *zio)
 	 * compression/checksumming/etc. work to prevent our (cheap) IO reissue.
 	 */
 	if (zio->io_error &&
-#ifdef ZIA
 	    !(zio->io_flags & ZIO_FLAG_ZIA_REEXECUTE) &&
-#endif
 	    vd == NULL &&
 	    !(zio->io_flags & (ZIO_FLAG_DONT_RETRY | ZIO_FLAG_IO_RETRY))) {
 		ASSERT(!(zio->io_flags & ZIO_FLAG_DONT_QUEUE));	/* not a leaf */
@@ -4977,9 +4934,7 @@ zio_done(zio_t *zio)
 	}
 
 	if (zio->io_error) {
-#ifdef ZIA
 		ASSERT(!(zio->io_flags & ZIO_FLAG_ZIA_REEXECUTE));
-#endif
 
 		/*
 		 * If this I/O is attached to a particular vdev,
@@ -5016,9 +4971,7 @@ zio_done(zio_t *zio)
 	}
 
 	if ((zio->io_error ||
-#ifdef ZIA
 	    (zio->io_flags & ZIO_FLAG_ZIA_REEXECUTE) ||
-#endif
 	    0) &&
 	    zio == zio->io_logical) {
 		/*
@@ -5392,10 +5345,7 @@ EXPORT_SYMBOL(zio_buf_alloc);
 EXPORT_SYMBOL(zio_data_buf_alloc);
 EXPORT_SYMBOL(zio_buf_free);
 EXPORT_SYMBOL(zio_data_buf_free);
-
-#ifdef ZIA
 EXPORT_SYMBOL(zio_push_transform);
-#endif
 
 ZFS_MODULE_PARAM(zfs_zio, zio_, slow_io_ms, INT, ZMOD_RW,
 	"Max I/O completion time (milliseconds) before marking it as slow");

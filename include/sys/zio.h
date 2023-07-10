@@ -223,9 +223,7 @@ typedef uint64_t zio_flag_t;
 #define	ZIO_FLAG_REEXECUTED	(1ULL << 29)
 #define	ZIO_FLAG_DELEGATED	(1ULL << 30)
 
-#ifdef ZIA
 #define	ZIO_FLAG_ZIA_REEXECUTE (1ULL << 32)
-#endif
 
 #define	ZIO_FLAG_MUSTSUCCEED		0
 #define	ZIO_FLAG_RAW	(ZIO_FLAG_RAW_COMPRESS | ZIO_FLAG_RAW_ENCRYPT)
@@ -530,9 +528,7 @@ struct zio {
 
 	/* Taskq dispatching state */
 	taskq_ent_t	io_tqent;
-#ifdef ZIA
 	boolean_t io_can_offload;
-#endif
 };
 
 enum blk_verify_flag {

@@ -87,6 +87,7 @@
 #include <sys/dsl_scan.h>
 #include <sys/zfeature.h>
 #include <sys/dsl_destroy.h>
+#include <sys/zia.h>
 #include <sys/zvol.h>
 
 #ifdef	_KERNEL
@@ -96,10 +97,6 @@
 #include <sys/zone.h>
 #include <sys/vmsystm.h>
 #endif	/* _KERNEL */
-
-#ifdef ZIA
-#include <sys/zia.h>
-#endif /* ZIA */
 
 #include "zfs_prop.h"
 #include "zfs_comutil.h"
@@ -456,7 +453,6 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 		}
 	}
 
-#ifdef ZIA
 	zia_props_t *zia_props = zia_get_props(spa);
 	if (zia_props->provider != NULL) {
 		spa_prop_add_list(*nvp, ZPOOL_PROP_ZIA_PROVIDER,
@@ -496,7 +492,6 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 
 	spa_prop_add_list(*nvp, ZPOOL_PROP_ZIA_DISK_WRITE,
 	    NULL, zia_props->disk_write, ZPROP_SRC_LOCAL);
-#endif
 }
 
 /*
@@ -811,7 +806,6 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 				error = SET_ERROR(E2BIG);
 			break;
 
-#ifdef ZIA
 		case ZPOOL_PROP_ZIA_PROVIDER:
 		case ZPOOL_PROP_ZIA_COMPRESS:
 		case ZPOOL_PROP_ZIA_DECOMPRESS:
@@ -825,7 +819,6 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 		case ZPOOL_PROP_ZIA_FILE_WRITE:
 		case ZPOOL_PROP_ZIA_DISK_WRITE:
 			break;
-#endif
 
 		default:
 			break;
@@ -1879,11 +1872,9 @@ spa_unload(spa_t *spa)
 		spa->spa_compatibility = NULL;
 	}
 
-#ifdef ZIA
 	if (zia_get_props(spa)->provider != NULL) {
 		zia_put_provider(&zia_get_props(spa)->provider);
 	}
-#endif
 
 	spa_config_exit(spa, SCL_ALL, spa);
 }
@@ -6246,9 +6237,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 
 	spa_import_os(spa);
 
-#ifdef ZIA
 	zia_get_props(spa)->can_offload = B_FALSE;
-#endif
 
 	mutex_exit(&spa_namespace_lock);
 
@@ -8960,9 +8949,7 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 	spa_t *spa = dmu_tx_pool(tx)->dp_spa;
 	objset_t *mos = spa->spa_meta_objset;
 	nvpair_t *elem = NULL;
-#ifdef ZIA
 	zia_props_t *zia_props = zia_get_props(spa);
-#endif
 
 	mutex_enter(&spa->spa_props_lock);
 
@@ -9036,7 +9023,6 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 			spa_history_log_internal(spa, "set", tx,
 			    "%s=%s", nvpair_name(elem), strval);
 			break;
-#ifdef ZIA
 		case ZPOOL_PROP_ZIA_PROVIDER:
 			strval = fnvpair_value_string(elem);
 			if (zia_props->provider != NULL)
@@ -9156,8 +9142,6 @@ spa_sync_props(void *arg, dmu_tx_t *tx)
 			zia_prop_warn(zia_props->disk_write,
 			    "Disk Write");
 			break;
-#endif
-
 		case ZPOOL_PROP_INVAL:
 			if (zpool_prop_feature(elemname)) {
 				fname = strchr(elemname, '@') + 1;
