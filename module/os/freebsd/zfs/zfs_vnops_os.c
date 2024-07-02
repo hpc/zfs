@@ -4456,15 +4456,15 @@ zfs_freebsd_read(struct vop_read_args *ap)
 	int error = 0;
 	znode_t *zp = VTOZ(ap->a_vp);
 	int ioflag = ioflags(ap->a_ioflag);
+	boolean_t is_direct;
 
 	zfs_uio_init(&uio, ap->a_uio);
 
-	zfs_direct_enabled_t direct =
-	    zfs_check_direct_enabled(zp, ioflag, &error);
+	error = zfs_check_direct_enabled(zp, ioflag, &is_direct);
 
-	if (direct == ZFS_DIRECT_IO_ERR) {
+	if (error) {
 		return (error);
-	} else if (direct == ZFS_DIRECT_IO_ENABLED) {
+	} else if (is_direct) {
 		error =
 		    zfs_freebsd_read_direct(zp, &uio, UIO_READ, ioflag,
 		    ap->a_cred);
@@ -4504,9 +4504,6 @@ zfs_freebsd_read(struct vop_read_args *ap)
 			ioflag &= ~O_DIRECT;
 	}
 
-
-	ASSERT(direct == ZFS_DIRECT_IO_DISABLED ||
-	    (direct == ZFS_DIRECT_IO_ENABLED && error == EAGAIN));
 
 	error = zfs_read(zp, &uio, ioflag, ap->a_cred);
 
@@ -4552,15 +4549,15 @@ zfs_freebsd_write(struct vop_write_args *ap)
 	int error = 0;
 	znode_t *zp = VTOZ(ap->a_vp);
 	int ioflag = ioflags(ap->a_ioflag);
+	boolean_t is_direct;
 
 	zfs_uio_init(&uio, ap->a_uio);
 
-	zfs_direct_enabled_t direct =
-	    zfs_check_direct_enabled(zp, ioflag, &error);
+	error = zfs_check_direct_enabled(zp, ioflag, &is_direct);
 
-	if (direct == ZFS_DIRECT_IO_ERR) {
+	if (error) {
 		return (error);
-	} else if (direct == ZFS_DIRECT_IO_ENABLED) {
+	} else if (is_direct) {
 		error =
 		    zfs_freebsd_write_direct(zp, &uio, UIO_WRITE, ioflag,
 		    ap->a_cred);
@@ -4575,9 +4572,6 @@ zfs_freebsd_write(struct vop_write_args *ap)
 			ioflag &= ~O_DIRECT;
 
 	}
-
-	ASSERT(direct == ZFS_DIRECT_IO_DISABLED ||
-	    (direct == ZFS_DIRECT_IO_ENABLED && error == EAGAIN));
 
 	error = zfs_write(zp, &uio, ioflag, ap->a_cred);
 

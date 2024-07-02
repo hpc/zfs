@@ -308,10 +308,7 @@ static int
 zfs_uio_get_dio_pages_impl(zfs_uio_t *uio)
 {
 	const struct iovec *iovp = GET_UIO_STRUCT(uio)->uio_iov;
-	size_t wanted;
-	size_t maxsize = zfs_uio_resid(uio);
-
-	wanted = maxsize;
+	size_t len = zfs_uio_resid(uio);
 
 	for (int i = 0; i < zfs_uio_iovcnt(uio); i++) {
 		struct iovec iov;
@@ -321,7 +318,7 @@ zfs_uio_get_dio_pages_impl(zfs_uio_t *uio)
 			iovp++;
 			continue;
 		}
-		iov.iov_len = MIN(maxsize, iovp->iov_len);
+		iov.iov_len = MIN(len, iovp->iov_len);
 		iov.iov_base = iovp->iov_base;
 		int error = zfs_uio_iov_step(iov, uio, &numpages);
 
@@ -329,12 +326,11 @@ zfs_uio_get_dio_pages_impl(zfs_uio_t *uio)
 			return (error);
 
 		uio->uio_dio.npages += numpages;
-		maxsize -= iov.iov_len;
-		wanted -= left;
+		len -= iov.iov_len;
 		iovp++;
 	}
 
-	ASSERT0(wanted);
+	ASSERT0(len);
 
 	return (0);
 }
