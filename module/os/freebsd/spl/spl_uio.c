@@ -49,6 +49,16 @@
 #include <sys/vm.h>
 #include <vm/vm_map.h>
 
+static void
+zfs_freeuio(struct uio *uio)
+{
+#if __FreeBSD_version > 1500013
+	freeuio(uio);
+#else
+	free(uio, M_IOV);
+#endif
+}
+
 int
 zfs_uiomove(void *cp, size_t n, zfs_uio_rw_t dir, zfs_uio_t *uio)
 {
@@ -81,7 +91,7 @@ zfs_uiocopy(void *p, size_t n, zfs_uio_rw_t rw, zfs_uio_t *uio, size_t *cbytes)
 	error = vn_io_fault_uiomove(p, n, uio_clone);
 	*cbytes = zfs_uio_resid(uio) - uio_clone->uio_resid;
 	if (uio_clone != &small_uio_clone)
-		free(uio_clone, M_IOV);
+		zfs_freeuio(uio_clone);
 	return (error);
 }
 
