@@ -143,7 +143,7 @@ zfs_uiomove_bvec_impl(void *p, size_t n, zfs_uio_rw_t rw, zfs_uio_t *uio)
 		void *paddr;
 		cnt = MIN(bv->bv_len - skip, n);
 
-		paddr = zfs_kmap_atomic(bv->bv_page);
+		paddr = zfs_kmap_local(bv->bv_page);
 		if (rw == UIO_READ) {
 			/* Copy from buffer 'p' to the bvec data */
 			memcpy(paddr + bv->bv_offset + skip, p, cnt);
@@ -151,7 +151,7 @@ zfs_uiomove_bvec_impl(void *p, size_t n, zfs_uio_rw_t rw, zfs_uio_t *uio)
 			/* Copy from bvec data to buffer 'p' */
 			memcpy(p, paddr + bv->bv_offset + skip, cnt);
 		}
-		zfs_kunmap_atomic(paddr);
+		zfs_kunmap_local(paddr);
 
 		skip += cnt;
 		if (skip == bv->bv_len) {
@@ -175,7 +175,7 @@ zfs_copy_bvec(void *p, size_t skip, size_t cnt, zfs_uio_rw_t rw,
 {
 	void *paddr;
 
-	paddr = zfs_kmap_atomic(bv->bv_page);
+	paddr = zfs_kmap_local(bv->bv_page);
 	if (rw == UIO_READ) {
 		/* Copy from buffer 'p' to the bvec data */
 		memcpy(paddr + bv->bv_offset + skip, p, cnt);
@@ -183,7 +183,7 @@ zfs_copy_bvec(void *p, size_t skip, size_t cnt, zfs_uio_rw_t rw,
 		/* Copy from bvec data to buffer 'p' */
 		memcpy(p, paddr + bv->bv_offset + skip, cnt);
 	}
-	zfs_kunmap_atomic(paddr);
+	zfs_kunmap_local(paddr);
 }
 
 /*
