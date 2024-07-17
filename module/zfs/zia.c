@@ -655,6 +655,13 @@ zia_offload_abd_offset(void *provider, abd_t *abd,
 		ret = dpusm->copy.from.generic(&mv,
 		    ABD_LINEAR_BUF(abd), size);
 		ret = dpusm_to_ret(ret);
+	}
+	else if (abd_is_from_pages(abd) == B_TRUE) {
+		ret = dpusm->copy.from.scatterlist(&mv,
+		    ABD_SCATTER(abd).abd_sgl,
+		    ABD_SCATTER(abd).abd_nents,
+		    size);
+		ret = dpusm_to_ret(ret);
 	} else {
 		ret = abd_iterate_func(abd, offset, size,
 		    zia_offload_generic_cb, &mv);

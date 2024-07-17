@@ -534,10 +534,8 @@ abd_alloc_zero_scatter(void)
 #define	PAGE_SHIFT (highbit64(PAGESIZE)-1)
 #endif
 
-#define	zfs_kmap_atomic(chunk)		((void *)chunk)
-#define	zfs_kunmap_atomic(addr)		do { (void)(addr); } while (0)
 #define	zfs_kmap(chunk)			((void *)chunk)
-#define	zfs_kunmap(chunk)		((void *)chunk)
+#define	zfs_kunmap(addr)		do { (void)(addr); } while (0)
 #define	zfs_kmap_local(chunk)		((void *)chunk)
 #define	zfs_kunmap_local(addr)		do { (void)(addr); } while (0)
 #define	local_irq_save(flags)		do { (void)(flags); } while (0)
@@ -1063,7 +1061,7 @@ abd_iter_map(struct abd_iter *aiter)
 		aiter->iter_mapsize = MIN(aiter->iter_sg->length - offset,
 		    aiter->iter_abd->abd_size - aiter->iter_pos);
 
-		paddr = zfs_kmap_local(sg_page(aiter->iter_sg));
+		paddr = zfs_kmap(sg_page(aiter->iter_sg));
 	}
 
 	aiter->iter_mapaddr = (char *)paddr + offset;
