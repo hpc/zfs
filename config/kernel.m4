@@ -288,27 +288,27 @@ dnl # Most modern Linux distributions have separate locations for bare
 dnl # source (source) and prebuilt (build) files. Additionally, there are
 dnl # `source` and `build` symlinks in `/lib/modules/$(KERNEL_VERSION)`
 dnl # pointing to them. The directory search order is now:
-dnl # 
+dnl #
 dnl # - `configure` command line values if both `--with-linux` and
 dnl #   `--with-linux-obj` were defined
-dnl # 
+dnl #
 dnl # - If only `--with-linux` was defined, `--with-linux-obj` is assumed
 dnl #   to have the same value as `--with-linux`
-dnl # 
+dnl #
 dnl # - If neither `--with-linux` nor `--with-linux-obj` were defined
 dnl #   autodetection is used:
-dnl # 
+dnl #
 dnl #   - `/lib/modules/$(uname -r)/{source,build}` respectively, if exist.
-dnl # 
+dnl #
 dnl #   - If only `/lib/modules/$(uname -r)/build` exists, it is assumed
 dnl #     to be both source and build directory.
-dnl # 
+dnl #
 dnl #   - The first directory in `/lib/modules` with the highest version
 dnl #     number according to `sort -V` which contains both `source` and
 dnl #     `build` symlinks/directories. If module directory contains only
 dnl #     `build` component, it is assumed to be both source and build
 dnl #     directory.
-dnl # 
+dnl #
 dnl #   - Last resort: the first directory matching `/usr/src/kernels/*`
 dnl #     and `/usr/src/linux-*` with the highest version number according
 dnl #     to `sort -V` is assumed to be both source and build directory.
@@ -549,10 +549,10 @@ AC_DEFUN([ZFS_AC_QAT], [
 
 		AC_MSG_RESULT([$qatbuild])
 		QAT_OBJ=${qatbuild}
-		AS_IF([ ! test -e "$QAT_OBJ/icp_qa_al.ko" && ! test -e "$QAT_OBJ/qat_api.ko"], [
+		AS_IF([ ! test -e "$QAT_OBJ/libqat_s.so" ], [
 			AC_MSG_ERROR([
 	*** Please make sure the qat driver is installed then try again.
-	*** Failed to find icp_qa_al.ko or qat_api.ko in:
+	*** Failed to find libqat_s.so in:
 	$QAT_OBJ])
 		])
 
@@ -568,7 +568,7 @@ AC_DEFUN([ZFS_AC_QAT], [
 	dnl #
 	AS_IF([test ! -z "${qatsrc}"], [
 		AC_MSG_CHECKING([qat file for module symbols])
-		QAT_SYMBOLS=$QAT_SRC/lookaside/access_layer/src/Module.symvers
+		QAT_SYMBOLS=$QAT_SRC/qat/Module.symvers
 
 		AS_IF([test -r $QAT_SYMBOLS], [
 			AC_MSG_RESULT([$QAT_SYMBOLS])

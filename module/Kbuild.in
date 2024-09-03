@@ -531,6 +531,6 @@ ZFS_QAT_PROVIDER_OBJS := \
 
 @ZIA_ENABLED_TRUE@@CONFIG_QAT_TRUE@$(addprefix $(obj)/zfs-qat-provider/,$(ZFS_QAT_PROVIDER_OBJS)) : ccflags-y += -I@abs_top_builddir@ $(ZFS_MODULE_CFLAGS) -I@abs_srcdir@/zfs-qat-provider/ -I@DPUSM_ROOT@/include/ -I@QAT_SRC@/include/ -Wframe-larger-than=20480
 
-@ZIA_ENABLED_TRUE@KBUILD_EXTRA_SYMBOLS += @QAT_SYMBOLS@
+@ZIA_ENABLED_TRUE@@CONFIG_QAT_TRUE@KBUILD_EXTRA_SYMBOLS += @QAT_SYMBOLS@
 
 endif
