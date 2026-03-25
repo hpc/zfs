@@ -364,6 +364,24 @@ kernel_offloader_free(void *handle)
 }
 
 int
+kernel_offloader_associate_handle(void *handle, void *ptr) {
+	koh_t *koh = (koh_t *)unswizzle(handle);
+	if (!koh) {
+		return (KERNEL_OFFLOADER_ERROR);
+	}
+
+	write_lock(&rwlock);
+	active_size -= koh->size;
+	active_actual -= koh->size;
+	kfree(koh->ptr);
+	write_unlock(&rwlock);
+
+	koh->ptr = ptr;
+	koh->type = KOH_REFERENCE;
+	return (KERNEL_OFFLOADER_OK);
+}
+
+int
 kernel_offloader_copy_from_generic(void *handle, size_t offset,
     const void *src, size_t size)
 {

@@ -1001,12 +1001,14 @@ zia_compress(zia_props_t *props, enum zio_compress c,
 	}
 
 	void *cbuf_handle = NULL;
+	*dst = abd_alloc_sametype(src, s_len);
 	const int rc = zia_compress_impl(dpusm, props, c, src, s_len,
-	    &cbuf_handle, d_len, level, local_offload);
-	if (rc == ZIA_OK) {
-		*dst = abd_alloc_sametype(src, s_len);
-		ABD_HANDLE(*dst) = cbuf_handle;
+	    dst, &cbuf_handle, d_len, level, local_offload);
+	if (rc != ZIA_OK) {
+		abd_free(*dst);
+		return (rc);
 	}
+	ABD_HANDLE(*dst) = cbuf_handle;
 	return (rc);
 #else
 	(void) props; (void) c; (void) src; (void) s_len;
@@ -1048,11 +1050,13 @@ zia_decompress(zia_props_t *props, enum zio_compress c,
 	 *
 	 * a lot of these will fail because d_len tends to be small
 	 */
-	ABD_HANDLE(dst) = zia_alloc(props->provider, d_len);
+	void *handle = zia_alloc(props->provider, d_len);
+	ABD_HANDLE(dst) = handle;
 	if (!ABD_HANDLE(dst)) {
 		/* let abd_free clean up zio->io_abd */
 		return (ZIA_ERROR);
 	}
+	dpusm->associate_handle(handle, ABD_LINEAR_BUF(dst));
 
 	/*
 	 * d_len pulled from accelerator is not used, so
@@ -1328,6 +1332,8 @@ zia_raidz_alloc(zio_t *zio, raidz_row_t *rr, boolean_t rec,
 			goto error;
 		}
 
+		dpusm->associate_handle(handle, ABD_LINEAR_BUF(rc->rc_abd));
+
 		if (dpusm->raid.set_column(rr->rr_zia_handle,
 		    c, handle, rc->rc_size) != DPUSM_OK) {
 			goto error;
@@ -1510,6 +1516,9 @@ zia_raidz_new_parity(zio_t *zio, raidz_row_t *rr, uint64_t c)
 	if (!new_parity_handle) {
 		return (ZIA_ERROR);
 	}
+
+	dpusm->associate_handle(new_parity_handle,
+	    ABD_LINEAR_BUF(rc->rc_abd));
 
 	const int ret = dpusm->raid.set_column(rr->rr_zia_handle,
 	    c, new_parity_handle, rc->rc_size);

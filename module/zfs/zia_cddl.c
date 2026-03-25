@@ -34,7 +34,7 @@
 int
 zia_compress_impl(const dpusm_uf_t *dpusm, zia_props_t *props,
     enum zio_compress c, abd_t *src, size_t s_len,
-    void **cbuf_handle, uint64_t *c_len,
+    abd_t **dst, void **cbuf_handle, uint64_t *c_len,
     uint8_t level, boolean_t *local_offload)
 {
 	size_t d_len;
@@ -128,6 +128,12 @@ zia_compress_impl(const dpusm_uf_t *dpusm, zia_props_t *props,
 	/* nothing to offload, so just allocate space */
 	*cbuf_handle = zia_alloc(props->provider,
 	    s_len);
+	/*
+	 * Don't care about return value because if handle
+	 * association wasn't completed, it'll still work normally
+	 */
+	dpusm->associate_handle(*cbuf_handle, ABD_LINEAR_BUF(*dst));
+
 	if (!*cbuf_handle) {
 		return (ZIA_ERROR);
 	}

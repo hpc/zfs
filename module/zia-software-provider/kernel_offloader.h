@@ -106,6 +106,7 @@ void *kernel_offloader_alloc(size_t size);
 void *kernel_offloader_alloc_ref(void *src, size_t offset, size_t size);
 int kernel_offloader_get_size(void *handle, size_t *size, size_t *actual);
 int kernel_offloader_free(void *handle);
+int kernel_offloader_associate_handle(void *handle, void *ptr);
 int kernel_offloader_copy_from_generic(void *handle, size_t offset,
     const void *src, size_t size);
 int kernel_offloader_copy_from_scatterlist(void *ptr, size_t offset,

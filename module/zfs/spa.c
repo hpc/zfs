@@ -901,7 +901,8 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 
 			void *new_provider = zia_get_provider(strval);
 			if (new_provider == NULL) {
-				error = SET_ERROR(ZFS_ERR_ZIA_NONEXISTENT_PROVIDER);
+				error = SET_ERROR(
+				    ZFS_ERR_ZIA_NONEXISTENT_PROVIDER);
 				break;
 			}
 

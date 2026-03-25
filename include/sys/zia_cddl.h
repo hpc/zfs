@@ -32,7 +32,7 @@
 int
 zia_compress_impl(const dpusm_uf_t *dpusm, zia_props_t *props,
     enum zio_compress c, abd_t *src, size_t s_len,
-    void **cbuf_handle, uint64_t *c_len,
+    abd_t **dst, void **cbuf_handle, uint64_t *c_len,
     uint8_t level, boolean_t *local_offload);
 
 int

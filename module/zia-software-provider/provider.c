@@ -197,6 +197,12 @@ sw_provider_get_size(void *handle, size_t *size, size_t *actual)
 }
 
 static int
+sw_provider_associate_handle(void *handle, void *ptr) {
+	return (translate_rc(kernel_offloader_associate_handle(handle,
+	    ptr)));
+}
+
+static int
 sw_provider_copy_from_generic(dpusm_mv_t *mv, const void *buf, size_t size)
 {
 	return (translate_rc(kernel_offloader_copy_from_generic(mv->handle,
@@ -409,6 +415,7 @@ static const dpusm_pf_t sw_provider_functions = {
 	.alloc_ref            = kernel_offloader_alloc_ref,
 	.get_size             = sw_provider_get_size,
 	.free                 = kernel_offloader_free,
+	.associate_handle     = sw_provider_associate_handle,
 	.copy                 = {
 	                            .from = {
 	                                        .generic      = sw_provider_copy_from_generic,
